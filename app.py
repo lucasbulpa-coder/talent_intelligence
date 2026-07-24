@@ -1,52 +1,77 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from modules.data_loader import load_data
-from modules.analytics import extraer_adn_exito
 
-st.set_page_config(page_title="Talent Intelligence", page_icon="🏢", layout="wide")
+# 1. Configuración Global de la Aplicación (Debe ser la primera línea de Streamlit)
+st.set_page_config(
+    page_title="Talent Intelligence Platform",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("🏢 Talent Intelligence Dashboard")
-st.markdown("### Visión Estratégica de Capital Humano")
-
+# 2. Precarga Silenciosa de Datos en Caché
+# Llamamos al DataLoader aquí para que los datos suban a la memoria RAM 
+# apenas el usuario abre la app, haciendo que la navegación entre páginas sea instantánea.
 df_desempeno, df_perfiles, df_consolidado = load_data()
 
-if not df_desempeno.empty:
-    # --- KPIs EJECUTIVOS ---
-    col1, col2, col3, col4 = st.columns(4)
-    
-    total_colab = len(df_desempeno)
-    
-    # Asumiendo que la columna se llama 'Evaluación' o 'Desempeño'
-    col_nota = 'Evaluación' if 'Evaluación' in df_desempeno.columns else df_desempeno.columns[2] 
-    
-    nota_promedio = df_desempeno[col_nota].mean() if pd.api.types.is_numeric_dtype(df_desempeno[col_nota]) else 0
-    top_performers = len(df_desempeno[df_desempeno[col_nota] >= 4.5]) if nota_promedio > 0 else 0
-    porcentaje_top = (top_performers / total_colab) * 100 if total_colab > 0 else 0
+# 3. Interfaz del Centro de Mando
+st.title("🧠 Talent Intelligence Platform")
+st.subheader("Sistema de Diagnóstico Organizacional, Sucesión y Desarrollo Estratégico")
 
-    col1.metric("Total Dotación", f"{total_colab}")
-    col2.metric("Desempeño Promedio", f"{nota_promedio:.2f}/5.0")
-    col3.metric("Top Performers (>= 4.5)", f"{porcentaje_top:.1f}%")
-    col4.metric("Índice de Idoneidad Global", "78%", "+3% vs Q anterior")
+st.markdown("---")
 
-    st.divider()
+# 4. Resumen Ejecutivo para Stakeholders
+col1, col2 = st.columns([2, 1])
 
-    # --- ANÁLISIS TRANSVERSAL DE ÉXITO ---
-    st.markdown("### 🧬 ADN Organizacional del Alto Desempeño")
-    st.caption("Cualidades emergentes extraídas del feedback de colaboradores con desempeño sobresaliente en toda la compañía.")
+with col1:
+    st.markdown("""
+    Bienvenido al centro de mando de Talento Organizacional. 
     
-    col_feedback = 'Feedback Jefatura Habilidades' if 'Feedback Jefatura Habilidades' in df_desempeno.columns else None
+    Esta plataforma transforma los datos aislados de desempeño y estructuras teóricas de cargo en inteligencia procesable, permitiendo a las gerencias tomar decisiones ágiles sobre movilidad interna y planes de capacitación.
     
-    if col_feedback and nota_promedio > 0:
-        habilidades_top = extraer_adn_exito(df_desempeno, col_feedback, col_nota, umbral=4.5, top_n=8)
-        
-        if habilidades_top:
-            df_chart = pd.DataFrame({'Habilidad': habilidades_top, 'Impacto Relativo': range(len(habilidades_top), 0, -1)})
-            fig = px.bar(df_chart, x='Impacto Relativo', y='Habilidad', orientation='h',
-                         title="Competencias Transversales Críticas", template="plotly_white")
-            fig.update_layout(yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No hay suficientes datos de texto en los top performers para extraer patrones consistentes.")
-else:
-    st.warning("Cargue los datos de desempeño para visualizar las métricas corporativas.")
+    ### ⚙️ Arquitectura y Capacidades del Sistema:
+    
+    *   📊 **Dashboard Directivo:** Indicadores clave de rendimiento, distribución de talento y evaluación del desempeño global por áreas operativas.
+    *   🧬 **ADN del Éxito:** Algoritmos de detección de patrones en los *Top Performers* para identificar las competencias que realmente impulsan el negocio.
+    *   🔄 **Sucesión Dinámica:** Motor analítico que simula escenarios de vacancia e identifica automáticamente a los candidatos internos más idóneos basándose en proximidad estructural y desempeño histórico.
+    *   🎓 **Gestión del Desarrollo (PDI):** Orquestación de rutas de aprendizaje estructuradas. Evalúa la disposición al cambio mediante la **metodología ADKAR** antes de realizar asignaciones.
+    """)
+
+with col2:
+    st.info("### 📡 Ecosistema Conectado")
+    st.markdown("""
+    El sistema está diseñado para generar *Payloads* (archivos JSON estructurados) listos para integrarse con:
+    
+    *   **Orquestadores de Flujo:** Activación de notificaciones y alertas automáticas.
+    *   **Learning Management System (LMS):** Enrolamiento directo en módulos digitales de inducción y reforzamiento técnico.
+    """)
+
+st.markdown("---")
+
+# 5. Panel de Estado de los Datos (Data Health)
+st.markdown("### 🗄️ Estado de la Ingesta de Datos")
+
+metric1, metric2, metric3 = st.columns(3)
+
+with metric1:
+    if not df_desempeno.empty:
+        st.success(f"✅ Evaluación de Desempeño: {len(df_desempeno)} registros cargados.")
+    else:
+        st.error("🚨 Evaluación de Desempeño: Faltan datos o archivo corrupto.")
+
+with metric2:
+    if not df_perfiles.empty:
+        st.success(f"✅ Perfiles de Cargo: {len(df_perfiles)} perfiles teóricos mapeados.")
+    else:
+        st.error("🚨 Perfiles de Cargo: Faltan datos o archivo corrupto.")
+
+with metric3:
+    if not df_consolidado.empty:
+        st.info(f"🔗 Motor de Cruce Operativo: {len(df_consolidado)} perfiles validados.")
+    else:
+        st.warning("⚠️ Motor de Cruce: Pendiente de validación conjunta.")
+
+# 6. Instrucciones de Navegación
+st.markdown("<br>", unsafe_allow_html=True)
+st.caption("👈 Utilice el menú lateral para navegar por los módulos operativos específicos.")

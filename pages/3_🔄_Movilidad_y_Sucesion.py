@@ -1,58 +1,93 @@
 import streamlit as st
 import pandas as pd
+import json
 from modules.data_loader import load_data
 
 st.set_page_config(page_title="Movilidad y Sucesión", layout="wide")
-st.title("🚀 Mapa de Movilidad Interna")
+st.title("🔄 Matriz Automática de Movilidad y Sucesión")
+st.markdown("""
+Esta herramienta simula escenarios de rotación. Al liberar una posición estratégica, el motor de inteligencia 
+identifica automáticamente a los sucesores internos más preparados, reduciendo los tiempos de vacancia.
+""")
 
-_, df_perfil, df_consolidado = load_data()
+# 1. Carga de Datos
+df_desempeno, df_perfiles, df_consolidado = load_data()
 
-if not df_consolidado.empty:
-    st.markdown("### 🔎 Búsqueda de Sucesores")
-    cargo_objetivo = st.selectbox("Seleccione el cargo a cubrir", df_perfil['Cargo'].dropna().unique())
+if not df_desempeno.empty:
+    # 2. Pipeline de Limpieza Estricta (Blindaje contra errores de Excel)
+    col_nota = 'Puntaje evaluación desempeño'
+    col_nombre = 'Nombre Completo'
+    col_cargo = 'Nombre Cargo'
+    col_area = 'Area' if 'Area' in df_desempeno.columns else 'Gerencia'
     
-    # Simulación de un motor de búsqueda interno para el MVP
-    st.write(f"Evaluando talento interno para: **{cargo_objetivo}**...")
-    
-    # Creamos un DataFrame falso de candidatos para el MVP visual
-    datos_candidatos = {
-        "Colaborador": ["Juan Pérez", "María González", "Carlos Soto"],
-        "Cargo Actual": ["Analista Jr", "Especialista", "Asistente"],
-        "Match Competencias (%)": [88, 75, 60],
-        "Desempeño Histórico": [4.8, 4.2, 3.9]
-    }
-    df_sucesores = pd.DataFrame(datos_candidatos)
-    
-    # Visualización de la tabla
-    st.dataframe(df_sucesores, use_container_width=True, hide_index=True)
-    
-    # BOTÓN DE DESCARGA PARA GERENCIA
-    csv = df_sucesores.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Exportar Lista de Sucesores (CSV)",
-        data=csv,
-        file_name=f'sucesores_{cargo_objetivo.replace(" ", "_")}.csv',
-        mime='text/csv',
-    )
+    # Estandarización de la columna de desempeño a numérica
+    if df_desempeno[col_nota].dtype == object:
+        df_desempeno[col_nota] = df_desempeno[col_nota].astype(str).str.replace(',', '.')
+    df_desempeno[col_nota] = pd.to_numeric(df_desempeno[col_nota], errors='coerce').fillna(0)
     
     st.divider()
-    st.markdown("### 📈 Planes de Desarrollo Individual")
+
+    # 3. Interfaz de Simulación de Vacancia
+    col1, col2 = st.columns([1, 2])
     
-    # FLUJO ORIENTADO A LA ACCIÓN
-    for index, row in df_sucesores.iterrows():
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"**{row['Colaborador']}** - Match: {row['Match Competencias (%)']}%")
+    with col1:
+        st.markdown("### 🏢 Escenario de Rotación")
+        cargo_vacante = st.selectbox(
+            "Seleccione el cargo que quedará vacante:", 
+            df_desempeno[col_cargo].dropna().unique()
+        )
+        
+        # Determinar el área del cargo vacante (para dar prioridad a candidatos de la misma área)
+        area_vacante = df_desempeno[df_desempeno[col_cargo] == cargo_vacante][col_area].iloc[0] if col_area in df_desempeno.columns else "General"
+        
+        st.info(f"**Área de la vacante:** {area_vacante}")
+
+    # 4. Motor Algorítmico de Sucesión
+    # Filtramos a los candidatos: excluimos a los que ya tienen ese cargo exacto
+    candidatos = df_desempeno[df_desempeno[col_cargo] != cargo_vacante].copy()
+    
+    if not candidatos.empty:
+        # Calcular el "Fit Score" (Puntaje de Idoneidad)
+        # Regla de negocio: El desempeño base pesa un 100%, pero si son de la misma área tienen un bonus del 5%
+        candidatos['bonus_area'] = candidatos[col_area].apply(lambda x: 1.05 if x == area_vacante else 1.0)
+        candidatos['fit_score'] = candidatos[col_nota] * candidatos['bonus_area']
+        
+        # Ordenar a los mejores 3 perfiles
+        sucesores = candidatos.sort_values(by='fit_score', ascending=False).head(3)
+        
         with col2:
-            # Botón único por cada candidato usando su índice
-            if st.button(f"Ver Plan de Nivelación", key=f"btn_{index}"):
-                with st.expander(f"Plan Formativo Estructurado: {row['Colaborador']}", expanded=True):
-                    st.write("**1. Awareness (Conciencia):** Alinear al colaborador con la necesidad de cubrir el rol de", cargo_objetivo)
-                    st.write("**2. Desire (Deseo):** Sesión de mentoring para motivar la transición al nuevo cargo.")
-                    st.write("**3. Knowledge (Conocimiento):** Asignación de módulos teóricos sobre las funciones principales.")
-                    st.write("**4. Ability (Habilidad):** 2 semanas de 'Shadowing' (sombra) con el titular actual del puesto.")
-                    st.write("**5. Reinforcement (Refuerzo):** Evaluación a los 30 días y ajustes al plan.")
-                    st.success("Plan enviado al sistema de gestión de capacitación.")
+            st.markdown(f"### 🥇 Sucesores Recomendados")
+            
+            # Formatear la tabla visual
+            tabla_mostrar = sucesores[[col_nombre, col_cargo, col_area, col_nota]].copy()
+            tabla_mostrar.columns = ['Candidato', 'Cargo Actual', 'Área Actual', 'Desempeño Histórico']
+            
+            st.dataframe(tabla_mostrar, use_container_width=True, hide_index=True)
+            
+            # 5. Integración Corporativa (Payload para flujos automatizados)
+            st.markdown("#### ⚡ Integración Operativa")
+            st.caption("Exporte los resultados para iniciar procesos de inducción y actualización de perfiles en el sistema.")
+            
+            # Preparamos los datos estructurados
+            payload_data = {
+                "evento_rotacion": {
+                    "cargo_liberado": cargo_vacante,
+                    "area_afectada": area_vacante
+                },
+                "asignacion_automatica": sucesores[[col_nombre, col_cargo, 'fit_score']].to_dict(orient='records')
+            }
+            
+            json_payload = json.dumps(payload_data, indent=4, ensure_ascii=False).encode('utf-8')
+            
+            st.download_button(
+                label="⚙️ Descargar Payload JSON para Power Automate",
+                data=json_payload,
+                file_name=f"trigger_sucesion_{cargo_vacante.replace(' ', '_')}.json",
+                mime="application/json",
+                type="primary"
+            )
+    else:
+        st.warning("No hay suficientes datos de otros colaboradores para calcular la sucesión.")
 
 else:
-    st.warning("Faltan datos para procesar la movilidad.")
+    st.error("No se han cargado los datos de desempeño. Verifique la ingesta de archivos.")
