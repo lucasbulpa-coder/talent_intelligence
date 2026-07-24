@@ -1,4 +1,8 @@
 import streamlit as st
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Colaboradores", "1,250", "+15 este mes")
+col2.metric("Top Performers", "20%", "Estable")
+col3.metric("Brecha de Competencias Promedio", "12%", "-2% vs Q anterior")
 
 st.set_page_config(
     page_title="Talent Intelligence Platform",

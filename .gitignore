@@ -1,0 +1,8 @@
+# Ocultar los datos sensibles de los colaboradores
+data/
+
+# Ocultar archivos de entorno virtual y caché de Python
+.venv/
+env/
+__pycache__/
+.env
