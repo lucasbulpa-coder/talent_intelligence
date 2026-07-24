@@ -1,38 +1,43 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from modules.data_loader import load_data
 
 st.set_page_config(page_title="Brechas y Formación", layout="wide")
-st.title("📚 Detección de Brechas Formativas")
+st.title("🎓 Análisis de Brechas y Plan de Formación (PDI)")
 
-desempeno, _, _ = load_data()
+df_desempeno, df_perfiles, df_consolidado = load_data()
 
-if not desempeno.empty:
-    st.markdown("### 📉 Áreas Críticas de Capacitación")
+if not df_desempeno.empty and not df_perfiles.empty:
     
-    # Simulamos el conteo de brechas agrupando por área para el MVP
-    if 'Area' in desempeno.columns:
-        brechas_area = desempeno.groupby('Area').size().reset_index(name='Necesidades Detectadas')
+    # 1. Definir los nombres exactos de TUS columnas
+    col_nombre = 'Nombre Completo'
+    col_cargo = 'Nombre Cargo'
+    col_nota = 'Puntaje evaluación desempeño'
+    
+    # Selector de colaborador corregido
+    colab = st.selectbox("Seleccione un colaborador para análisis de brechas", df_desempeno[col_nombre].dropna().unique())
+    
+    # Filtrar los datos del colaborador seleccionado
+    datos_colab = df_desempeno[df_desempeno[col_nombre] == colab].iloc[0]
+    cargo_colab = datos_colab[col_cargo]
+    
+    st.markdown(f"### 👤 Colaborador: {colab}")
+    st.caption(f"Cargo Actual: {cargo_colab} | Evaluación: {datos_colab[col_nota]}")
+    
+    st.divider()
+    
+    # Buscar el perfil teórico de ese cargo
+    if cargo_colab in df_perfiles['Cargo'].values:
+        perfil_teorico = df_perfiles[df_perfiles['Cargo'] == cargo_colab].iloc[0]
         
-        # Gráfico de barras de Plotly
-        fig = px.bar(brechas_area, x='Area', y='Necesidades Detectadas', 
-                     title="Volumen de Brechas por Área", text_auto=True, template="plotly_white")
-        fig.update_traces(marker_color='#0047AB') # Color corporativo
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.markdown("### 📋 Detalle Operativo para Malla de Entrenamiento")
-        st.dataframe(brechas_area, use_container_width=True, hide_index=True)
-        
-        # BOTÓN DE DESCARGA
-        csv_brechas = brechas_area.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Exportar Reporte de Brechas (CSV)",
-            data=csv_brechas,
-            file_name='reporte_brechas_areas.csv',
-            mime='text/csv',
-        )
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**Conocimientos Exigidos por el Perfil:**\n{perfil_teorico.get('Conocimientos Técnicos', 'No definidos')}")
+        with col2:
+            st.warning(f"**Feedback Técnico de Jefatura:**\n{datos_colab.get('Comentario abierto de habilidades tecnica que detecta la jefarura', 'Sin comentarios')}")
+            
     else:
-        st.info("La columna 'Area' no está disponible en los datos para graficar.")
+        st.warning("No se encontró el perfil de cargo teórico para realizar la comparación de brechas.")
+
 else:
-    st.warning("No hay datos suficientes para el análisis de brechas.")
+    st.error("Faltan datos de desempeño o perfiles para ejecutar esta página.")

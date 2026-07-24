@@ -1,59 +1,78 @@
 import streamlit as st
 import pandas as pd
-import re
-import plotly.express as px
-from collections import Counter
+import plotly.graph_objects as go
 from modules.data_loader import load_data
+from modules.analytics import extraer_adn_exito
 
 st.set_page_config(page_title="Perfiles Inteligentes", layout="wide")
-st.title("🎯 Comparativa: Perfil Teórico vs Real")
+st.title("🎯 Perfiles Inteligentes: Teórico vs Práctica")
 
-def extraer_patrones(lista_textos):
-    if not lista_textos: return []
-    texto_completo = " ".join(str(t) for t in lista_textos).lower()
-    palabras = re.findall(r'\b[a-záéíóúñ]+\b', texto_completo)
-    stopwords = {"que", "de", "la", "el", "en", "y", "a", "los", "las", "se", "con", "por", "para", "un", "una", "su", "es", "del", "lo", "como", "más", "tiene", "muy"}
-    palabras_clave = [p for p in palabras if p not in stopwords and len(p) > 3]
-    return Counter(palabras_clave).most_common(5)
+df_desempeno, df_perfiles, df_consolidado = load_data()
 
-_, _, df_consolidado = load_data()
-
-if not df_consolidado.empty:
-    cargo_seleccionado = st.selectbox("Seleccione un Cargo para analizar", df_consolidado['Nombre Cargo'].dropna().unique())
-    df_cargo = df_consolidado[df_consolidado['Nombre Cargo'] == cargo_seleccionado]
+if not df_consolidado.empty and not df_perfiles.empty:
+    # --- 1. AJUSTE A TU ESCALA REAL Y FORMATO DE DATOS ---
+    col_nota = 'Puntaje evaluación desempeño'
     
-    if not df_cargo.empty:
-        # Extraer patrones
-        textos_hab = df_cargo['Feedback Jefatura Habilidades'].dropna().tolist() if 'Feedback Jefatura Habilidades' in df_cargo.columns else []
-        patrones = extraer_patrones(textos_hab)
+    # Limpiamos y convertimos la columna a numérico
+    if col_nota in df_consolidado.columns:
+        if df_consolidado[col_nota].dtype == object:
+            df_consolidado[col_nota] = df_consolidado[col_nota].astype(str).str.replace(',', '.')
+        df_consolidado[col_nota] = pd.to_numeric(df_consolidado[col_nota], errors='coerce')
+    
+    # Usamos tus nombres de columnas exactos
+    col_feedback = 'Comentario abierto de habilidades tecnica que detecta la jefarura'
+
+    cargo = st.selectbox("Seleccione un Cargo Estratégico", df_perfiles['Cargo'].dropna().unique())
+    
+    # Filtrar datos del cargo
+    datos_cargo = df_consolidado[df_consolidado['Nombre Cargo'] == cargo]
+    perfil_teorico = df_perfiles[df_perfiles['Cargo'] == cargo].iloc[0]
+    
+    # --- 2. UMBRAL DINÁMICO ---
+    # En lugar de 4.5, calculamos quiénes están en el 20% superior de desempeño (percentil 80)
+    umbral_top = df_consolidado[col_nota].quantile(0.80)
+
+    # Extraer ADN de los mejores en ESTE cargo
+    adn_exito = extraer_adn_exito(datos_cargo, col_feedback, col_nota, umbral=umbral_top, top_n=5) if col_feedback in df_consolidado.columns else []
+
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("### 📋 Perfil Base (Requisitos Formales)")
+        st.info(f"**Conocimientos Técnicos Exigidos:**\n{perfil_teorico.get('Conocimientos Técnicos', 'N/A')}")
+        st.info(f"**Competencias Blandas Oficiales:**\n{perfil_teorico.get('Competencias Blandas', 'N/A')}")
+
+    with col2:
+        st.markdown("### 🧬 ADN del Alto Desempeño (Práctica)")
+        if adn_exito:
+            st.success("**Competencias descubiertas en Top Performers:**\n\n" + "\n".join([f"✔️ {hab.capitalize()}" for hab in adn_exito]))
+            st.caption(f"Patrones extraídos del feedback de jefaturas para colaboradores con nota superior a {umbral_top:.1f}")
+        else:
+            st.warning("No hay suficientes datos de alto desempeño en los comentarios para extraer patrones emergentes.")
+
+    st.divider()
+    
+    # Gráfico de Radar Estratégico
+    if adn_exito:
+        st.markdown("### 📊 Alineación de Competencias")
+        # Simulamos los ejes combinando lo teórico y lo práctico
+        categorias = ['Conocimiento Base', 'Habilidades Blandas', 'Desempeño Operativo'] + [h.capitalize() for h in adn_exito[:2]]
         
-        # Construir datos para el radar (simulando puntajes para el MVP)
-        if patrones:
-            conceptos = [p[0].capitalize() for p in patrones]
-            frecuencias = [p[1] for p in patrones]
-            nivel_esperado = [max(frecuencias) + 1] * len(conceptos) # El ideal siempre es un poco superior al máximo observado
-            
-            df_radar = pd.DataFrame({
-                'Competencia': conceptos * 2,
-                'Puntaje': frecuencias + nivel_esperado,
-                'Tipo': ['Real Observado'] * len(conceptos) + ['Teórico Requerido'] * len(conceptos)
-            })
-            
-            fig = px.line_polar(df_radar, r='Puntaje', theta='Competencia', color='Tipo', line_close=True,
-                                template="plotly_white", title=f"Análisis de Brechas: {cargo_seleccionado}")
-            fig.update_traces(fill='toself', opacity=0.5)
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("### 📘 Perfil Teórico (Diseño)")
-            st.info(f"**🧠 Conocimientos Técnicos:**\n\n{df_cargo['Conocimientos Técnicos'].iloc[0] if 'Conocimientos Técnicos' in df_cargo.columns else 'N/A'}")
-            
-        with col2:
-            st.markdown("### 📊 Patrones de Feedback (Real)")
-            if patrones:
-                for palabra, frecuencia in patrones:
-                    st.progress(min(frecuencia * 10, 100), text=f"{palabra.capitalize()} (Mencionado {frecuencia} veces)")
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=[3, 4, 3, 2, 2],
+            theta=categorias,
+            fill='toself',
+            name='Perfil Teórico Actual'
+        ))
+        fig.add_trace(go.Scatterpolar(
+            r=[4, 3, 4, 5, 5], # Puntuaciones altas en las habilidades emergentes
+            theta=categorias,
+            fill='toself',
+            name='Perfil Top Performer Observado'
+        ))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=True, template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+
 else:
-    st.warning("Datos no disponibles.")
+    st.warning("Faltan datos de perfiles o desempeño para realizar el cruce analítico.")

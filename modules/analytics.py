@@ -1,67 +1,44 @@
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+import re
 
-def get_top_performers(df, column_score='Puntaje evaluación desempeño', top_percent=0.20):
-    """Filtra el dataframe para obtener el Top 20% de la organización."""
-    if df.empty or column_score not in df.columns:
-        return df
-    
-    umbral = df[column_score].quantile(1 - top_percent)
-    top_df = df[df[column_score] >= umbral].copy()
-    return top_df
+def limpiar_texto(texto):
+    if not isinstance(texto, str): return ""
+    texto = texto.lower()
+    texto = re.sub(r'[^a-záéíóúñ\s]', '', texto)
+    return texto
 
-def calculate_match(persona_skills, cargo_skills):
-    """Calcula el % de coincidencia entre texto observado y perfil (MVP: coincidencias exactas/parciales)."""
-    if pd.isna(persona_skills) or pd.isna(cargo_skills):
-        return 0
+def extraer_adn_exito(df, columna_texto, columna_desempeno, umbral=4.5, top_n=5):
+    """
+    Extrae las competencias clave aislando solo a los top performers.
+    """
+    if df.empty or columna_texto not in df.columns or columna_desempeno not in df.columns:
+        return []
+
+    # Filtrar solo a los de alto desempeño
+    df_top = df[df[columna_desempeno] >= umbral].copy()
+    if df_top.empty: return []
+
+    textos = df_top[columna_texto].apply(limpiar_texto).tolist()
+    textos = [t for t in textos if t.strip() != ""]
     
-    persona_words = set(str(persona_skills).lower().replace(',', ' ').split())
-    cargo_words = set(str(cargo_skills).lower().replace(',', ' ').split())
-    
-    if not cargo_words:
-        return 0
+    if not textos: return []
+
+    # Stopwords en español ampliadas
+    stopwords_es = ["que", "de", "la", "el", "en", "y", "a", "los", "las", "se", "con", "por", "para", "un", "una", "su", "es", "del", "lo", "como", "más", "tiene", "muy", "pero", "este", "ha", "su", "sus", "sobre"]
+
+    try:
+        vectorizer = TfidfVectorizer(stop_words=stopwords_es, max_features=20, ngram_range=(1, 2))
+        tfidf_matrix = vectorizer.fit_transform(textos)
         
-    coincidencias = persona_words.intersection(cargo_words)
-    match_score = (len(coincidencias) / len(cargo_words)) * 100
-    
-    return round(min(match_score, 100.0), 1)
-# --- AGREGA ESTO AL FINAL DE TU ARCHIVO modules/analytics.py ---
-
-def extract_keywords(text_series):
-    """Extrae las palabras más frecuentes de una columna de texto (MVP sin IA avanzada)."""
-    text = " ".join(text_series.dropna().astype(str)).lower()
-    # Filtramos conectores básicos (Stopwords manuales)
-    stopwords = {"para", "como", "pero", "este", "esta", "todo", "tiene", "sobre", "entre", "cuando", "desde"}
-    
-    # Limpiamos puntuación y separamos palabras
-    words = text.replace(",", " ").replace(".", " ").split()
-    # Nos quedamos con palabras relevantes (más de 4 letras y que no sean stopwords)
-    relevant_words = [w for w in words if len(w) > 4 and w not in stopwords]
-    
-    # Contamos frecuencias
-    return pd.Series(relevant_words).value_counts()
-
-def calculate_gaps(df_top, df_resto, text_column):
-    """Calcula la brecha (Gap) de competencias entre el Top 20% y el Resto."""
-    if df_top.empty or df_resto.empty:
-        return pd.DataFrame()
-
-    top_kw = extract_keywords(df_top[text_column])
-    resto_kw = extract_keywords(df_resto[text_column])
-
-    # Convertir a porcentajes relativos (frecuencia / cantidad de personas)
-    top_pct = (top_kw / len(df_top) * 100).round(1)
-    resto_pct = (resto_kw / len(df_resto) * 100).round(1)
-
-    # Unir ambos resultados
-    df_brechas = pd.DataFrame({
-        'Presencia Top Performers (%)': top_pct,
-        'Presencia Resto (%)': resto_pct
-    }).fillna(0)
-
-    # Calcular la brecha matemática
-    df_brechas['Brecha (%)'] = df_brechas['Presencia Top Performers (%)'] - df_brechas['Presencia Resto (%)']
-    
-    # Ordenar por las competencias que más diferencian al Top 20%
-    df_brechas = df_brechas.sort_values(by='Brecha (%)', ascending=False)
-    
-    return df_brechas.head(10) # Devolver el Top 10 de brechas
+        # Sumar los scores TF-IDF para encontrar los términos más relevantes
+        scores = tfidf_matrix.sum(axis=0).A1
+        palabras = vectorizer.get_feature_names_out()
+        
+        # Crear un dataframe con los resultados y ordenar
+        df_scores = pd.DataFrame({'Competencia': palabras, 'Score': scores})
+        df_scores = df_scores.sort_values(by='Score', ascending=False).head(top_n)
+        
+        return df_scores['Competencia'].tolist()
+    except Exception as e:
+        return []

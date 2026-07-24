@@ -1,39 +1,71 @@
 import streamlit as st
+import pandas as pd
 import plotly.express as px
 from modules.data_loader import load_data
-from modules.analytics import get_top_performers
 
 st.set_page_config(page_title="Talento y Desempeño", layout="wide")
-st.title("📈 Dashboard de Talento y Desempeño")
+st.title("📈 Análisis de Talento y Desempeño")
 
-_, _, df = load_data()
+df_desempeno, _, _ = load_data()
 
-if not df.empty:
-    col1, col2, col3 = st.columns(3)
+if not df_desempeno.empty:
+    # 1. Usar el nombre exacto de TU columna de Excel
+    col_nota = 'Puntaje evaluación desempeño'
     
-    # Filtros
-    area_filter = col1.selectbox("Filtrar por Área", ["Todas"] + list(df['Area'].dropna().unique()))
+    # Validación por si el Excel viene con comas en lugar de puntos (esto evita el TypeError)
+    if df_desempeno[col_nota].dtype == object:
+        df_desempeno[col_nota] = df_desempeno[col_nota].astype(str).str.replace(',', '.')
     
-    df_filtered = df if area_filter == "Todas" else df[df['Area'] == area_filter]
+    # Forzar numérico
+    df_desempeno[col_nota] = pd.to_numeric(df_desempeno[col_nota], errors='coerce')
+    df_desempeno = df_desempeno.dropna(subset=[col_nota])
     
-    # KPIs Generales
-    st.markdown("### Métricas Clave")
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Total Colaboradores", len(df_filtered))
-    k2.metric("Promedio Desempeño", round(df_filtered['Puntaje evaluación desempeño'].mean(), 1))
+    st.markdown("### 📊 Distribución del Desempeño Organizacional")
+    st.caption("Visualización de la curva de rendimiento de la compañía basada en cumplimiento.")
     
-    top_df = get_top_performers(df_filtered)
-    k3.metric("Top Performers (20%)", len(top_df))
+    # Histograma usando tus datos (de 90 a 115 aprox)
+    fig = px.histogram(df_desempeno, x=col_nota, nbins=15, 
+                       labels={col_nota: "Puntaje de Evaluación"},
+                       template="plotly_white")
     
-    # Gráficos
-    st.markdown("---")
-    st.markdown("### Distribución de Desempeño")
-    fig = px.histogram(df_filtered, x='Puntaje evaluación desempeño', nbins=10, 
-                       color_discrete_sequence=['#2E86C1'], template='plotly_white')
+    fig.update_traces(marker_color='#0047AB') 
+    fig.update_layout(yaxis_title="Cantidad de Colaboradores")
     st.plotly_chart(fig, use_container_width=True)
     
-    # Tabla Top Performers
-    st.markdown("### Listado Top Performers")
-    st.dataframe(top_df[['Nombre Completo', 'Nombre Cargo', 'Area', 'Puntaje evaluación desempeño']])
+    st.divider()
+    
+    st.markdown("### 🏆 Segmentación de Top Performers")
+    st.caption("Identificación de talento clave según el umbral de sobrecumplimiento.")
+    
+    # 2. Control dinámico para la gerencia
+    umbral_defecto = float(df_desempeno[col_nota].quantile(0.80)) # Por defecto, el top 20%
+    umbral = st.slider("Defina el puntaje mínimo para considerar a un Top Performer:", 
+                       min_value=float(df_desempeno[col_nota].min()), 
+                       max_value=float(df_desempeno[col_nota].max()), 
+                       value=umbral_defecto)
+    
+    # Filtro usando la variable del slider
+    df_top = df_desempeno[df_desempeno[col_nota] >= umbral].sort_values(by=col_nota, ascending=False)
+    
+    if not df_top.empty:
+        # Mostrar las columnas que tienes realmente en tu Excel
+        cols_mostrar = ['Nombre Completo', 'Nombre Cargo', 'Area', col_nota]
+        
+        # Filtramos por las que existan para no romper el código si falta alguna
+        cols_existentes = [col for col in cols_mostrar if col in df_top.columns]
+        
+        st.write(f"**Total de talentos identificados:** {len(df_top)} colaboradores.")
+        st.dataframe(df_top[cols_existentes], use_container_width=True, hide_index=True)
+        
+        csv = df_top.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Exportar Lista de Talentos (CSV)",
+            data=csv,
+            file_name='top_performers_organizacional.csv',
+            mime='text/csv',
+        )
+    else:
+        st.info("No hay colaboradores que superen este umbral de evaluación.")
+        
 else:
-    st.warning("No hay datos cargados. Verifica los archivos Excel.")
+    st.warning("No hay datos de desempeño cargados. Verifique el archivo fuente.")
