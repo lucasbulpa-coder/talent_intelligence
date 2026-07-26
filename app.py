@@ -1,77 +1,106 @@
 import streamlit as st
-import pandas as pd
 from modules.data_loader import load_data
 
-# 1. Configuración Global de la Aplicación (Debe ser la primera línea de Streamlit)
-st.set_page_config(
-    page_title="Talent Intelligence Platform",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Talent Intelligence | Inicio", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. Precarga Silenciosa de Datos en Caché
-# Llamamos al DataLoader aquí para que los datos suban a la memoria RAM 
-# apenas el usuario abre la app, haciendo que la navegación entre páginas sea instantánea.
-df_desempeno, df_perfiles, df_consolidado = load_data()
+# 1. Inyección de CSS de Nivel Empresarial (Estilo Mockup)
+st.markdown("""
+<style>
+    /* Ocultar elementos nativos de Streamlit para un look limpio */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    .block-container {padding-top: 1rem; max-width: 95%;}
+    
+    /* Barra Superior Personalizada */
+    .top-navbar {
+        display: flex; justify-content: space-between; align-items: center;
+        padding-bottom: 1.5rem; border-bottom: 1px solid #2D3748; margin-bottom: 3rem;
+    }
+    .brand { font-size: 1.4rem; font-weight: 500; color: #ffffff; }
+    .brand span { color: #00E5FF; font-weight: 700; margin-right: 5px; }
+    .user-profile { display: flex; align-items: center; gap: 15px; }
+    .user-info { text-align: right; line-height: 1.2; }
+    .user-name { color: #ffffff; font-weight: 600; font-size: 0.95rem; }
+    .user-role { color: #8F9BBA; font-size: 0.8rem; }
+    .avatar { 
+        background-color: #00E5FF; color: #0b0f19; width: 40px; height: 40px; 
+        border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+        font-weight: 700; font-size: 1.1rem; 
+    }
 
-# 3. Interfaz del Centro de Mando
-st.title("🧠 Talent Intelligence Platform")
-st.subheader("Sistema de Diagnóstico Organizacional, Sucesión y Desarrollo Estratégico")
+    /* Hero Section */
+    .hero-title { font-size: 3.5rem; font-weight: 700; line-height: 1.1; margin-bottom: 1rem; color: #ffffff; }
+    .hero-subtitle { font-size: 1.2rem; color: #8F9BBA; margin-bottom: 2.5rem; }
+    
+    /* Tarjetas de Módulos (Cards) */
+    .module-card {
+        background-color: #161b26; border: 1px solid #2D3748; border-radius: 12px;
+        padding: 1.8rem; height: 100%; transition: all 0.3s ease;
+    }
+    .module-card:hover { border-color: #00E5FF; transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,229,255,0.1); }
+    .card-title { color: #ffffff; font-size: 1.5rem; font-weight: 600; margin-bottom: 0.8rem; }
+    .card-desc { color: #8F9BBA; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5; min-height: 45px;}
+    .card-action { color: #00E5FF; font-weight: 600; font-size: 1rem; display: flex; align-items: center; gap: 5px;}
+    
+    /* Botón nativo modificado */
+    div.stButton > button { background-color: #00E5FF; color: #0b0f19; font-weight: 600; border-radius: 8px; border: none; padding: 0.5rem 2rem; }
+    div.stButton > button:hover { background-color: #ffffff; color: #0b0f19; }
+</style>
+""", unsafe_allow_html=True)
 
-st.markdown("---")
+# 2. Barra Superior Simulada (Mockup UI)
+st.markdown("""
+<div class="top-navbar">
+    <div class="brand"><span>TI</span> Talent Intelligence</div>
+    <div class="user-profile">
+        <div class="user-info">
+            <div class="user-name">María Jiménez</div>
+            <div class="user-role">RR.HH. · BICECORP</div>
+        </div>
+        <div class="avatar">MJ</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# 4. Resumen Ejecutivo para Stakeholders
-col1, col2 = st.columns([2, 1])
-
+# 3. Hero Section
+col1, col2 = st.columns([1.2, 1])
 with col1:
+    st.markdown('<div class="hero-title">Gestiona el talento con datos, no con intuición</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-subtitle">Habilidades, movilidad interna y compensación en una plataforma para BICECORP.</div>', unsafe_allow_html=True)
+    st.button("Explorar módulos")
+
+st.markdown("<br><br><br>", unsafe_allow_html=True)
+st.markdown("<h4 style='color: #8F9BBA; font-size: 0.9rem; letter-spacing: 2px;'>MÓDULOS</h4>", unsafe_allow_html=True)
+
+# 4. Tarjetas Interactivas (Formación, Selección, Compensación)
+c1, c2, c3 = st.columns(3)
+
+with c1:
     st.markdown("""
-    Bienvenido al centro de mando de Talento Organizacional. 
-    
-    Esta plataforma transforma los datos aislados de desempeño y estructuras teóricas de cargo en inteligencia procesable, permitiendo a las gerencias tomar decisiones ágiles sobre movilidad interna y planes de capacitación.
-    
-    ### ⚙️ Arquitectura y Capacidades del Sistema:
-    
-    *   📊 **Dashboard Directivo:** Indicadores clave de rendimiento, distribución de talento y evaluación del desempeño global por áreas operativas.
-    *   🧬 **ADN del Éxito:** Algoritmos de detección de patrones en los *Top Performers* para identificar las competencias que realmente impulsan el negocio.
-    *   🔄 **Sucesión Dinámica:** Motor analítico que simula escenarios de vacancia e identifica automáticamente a los candidatos internos más idóneos basándose en proximidad estructural y desempeño histórico.
-    *   🎓 **Gestión del Desarrollo (PDI):** Orquestación de rutas de aprendizaje estructuradas. Evalúa la disposición al cambio mediante la **metodología ADKAR** antes de realizar asignaciones.
-    """)
+    <div class="module-card">
+        <div class="card-title">Formación</div>
+        <div class="card-desc">Brechas de habilidades y planes de desarrollo por colaborador.</div>
+        <div class="card-action">3 vistas &rarr;</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col2:
-    st.info("### 📡 Ecosistema Conectado")
+with c2:
     st.markdown("""
-    El sistema está diseñado para generar *Payloads* (archivos JSON estructurados) listos para integrarse con:
-    
-    *   **Orquestadores de Flujo:** Activación de notificaciones y alertas automáticas.
-    *   **Learning Management System (LMS):** Enrolamiento directo en módulos digitales de inducción y reforzamiento técnico.
-    """)
+    <div class="module-card">
+        <div class="card-title">Selección</div>
+        <div class="card-desc">Cruce de vacantes con talento interno potencial.</div>
+        <div class="card-action">12 vacantes &rarr;</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("---")
+with c3:
+    st.markdown("""
+    <div class="module-card">
+        <div class="card-title">Compensación</div>
+        <div class="card-desc">Ajustes de renta sugeridos según perfil y mercado.</div>
+        <div class="card-action">8 ajustes &rarr;</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# 5. Panel de Estado de los Datos (Data Health)
-st.markdown("### 🗄️ Estado de la Ingesta de Datos")
-
-metric1, metric2, metric3 = st.columns(3)
-
-with metric1:
-    if not df_desempeno.empty:
-        st.success(f"✅ Evaluación de Desempeño: {len(df_desempeno)} registros cargados.")
-    else:
-        st.error("🚨 Evaluación de Desempeño: Faltan datos o archivo corrupto.")
-
-with metric2:
-    if not df_perfiles.empty:
-        st.success(f"✅ Perfiles de Cargo: {len(df_perfiles)} perfiles teóricos mapeados.")
-    else:
-        st.error("🚨 Perfiles de Cargo: Faltan datos o archivo corrupto.")
-
-with metric3:
-    if not df_consolidado.empty:
-        st.info(f"🔗 Motor de Cruce Operativo: {len(df_consolidado)} perfiles validados.")
-    else:
-        st.warning("⚠️ Motor de Cruce: Pendiente de validación conjunta.")
-
-# 6. Instrucciones de Navegación
-st.markdown("<br>", unsafe_allow_html=True)
-st.caption("👈 Utilice el menú lateral para navegar por los módulos operativos específicos.")
+# Pre-carga de datos silenciosa
+df_desempeno, df_perfiles, df_consolidado = load_data()

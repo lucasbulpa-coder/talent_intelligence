@@ -1,38 +1,25 @@
+# modules/integrations.py
 import requests
-import logging
 import json
+from datetime import datetime
 
-class WorkflowOrchestrator:
+def trigger_administrative_workflow(employee_email, action_type, payload, webhook_url):
     """
-    Módulo de integración directa con plataformas empresariales (ej. Power Automate).
+    Envía un payload estructurado a un webhook externo (ej. Power Automate) 
+    para orquestar flujos administrativos y notificaciones de cumplimiento.
     """
-    def __init__(self, webhook_url):
-        self.webhook_url = webhook_url
-        self.headers = {'Content-Type': 'application/json'}
-
-    def disparar_transicion_cargo(self, saliente, entrante, cargo):
-        """
-        Notifica automáticamente que Pedrito sale y Juan entra, 
-        gatillando procesos de TI y Recursos Humanos en segundos.
-        """
-        payload = {
-            "evento": "sucesion_automatica",
-            "colaborador_saliente": saliente,
-            "colaborador_entrante": entrante,
-            "cargo_asignado": cargo,
-            "accion_requerida": "actualizar_sistemas_e_iniciar_induccion"
-        }
-        
-        try:
-            # Se envía el paquete de datos en milisegundos sin intervención humana
-            response = requests.post(
-                self.webhook_url, 
-                data=json.dumps(payload), 
-                headers=self.headers
-            )
-            response.raise_for_status()
-            logging.info(f"Éxito: Flujo de sucesión disparado para {entrante}")
-            return True
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Falla de integración al orquestador: {e}")
-            return False
+    headers = {'Content-Type': 'application/json'}
+    
+    data = {
+        "timestamp": datetime.now().isoformat(),
+        "employee_email": employee_email,
+        "action_type": action_type,  # Ej: 'NUEVO_PLAN_FORMACION', 'CANDIDATO_SUCESION'
+        "details": payload
+    }
+    
+    try:
+        response = requests.post(webhook_url, data=json.dumps(data), headers=headers)
+        response.raise_for_status()
+        return True, "Flujo automatizado detonado con éxito."
+    except requests.exceptions.RequestException as e:
+        return False, f"Error al conectar con el orquestador: {str(e)}"

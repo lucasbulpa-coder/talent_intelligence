@@ -1,32 +1,34 @@
-import pandas as pd
+# modules/succession_engine.py
 
-class SuccessionEngine:
-    """
-    Algoritmo de movilidad interna y planes de sucesión.
-    """
-    def __init__(self, df_talento, df_perfiles):
-        self.talento = df_talento
-        self.perfiles = df_perfiles
+def analyze_skill_gaps(current_skills, required_skills):
+    """Calcula las brechas entre las habilidades actuales y las requeridas para un cargo."""
+    gaps = {}
+    for skill, req_level in required_skills.items():
+        curr_level = current_skills.get(skill, 0)
+        if curr_level < req_level:
+            gaps[skill] = req_level - curr_level
+    return gaps
 
-    def calcular_reemplazo_automatico(self, cargo_vacante, top_n=3):
-        """
-        Si un colaborador sale de la organización, identifica automáticamente
-        a los sucesores internos basándose en desempeño y proximidad de cargo.
-        """
-        if self.talento.empty:
-            return None
-            
-        # 1. Excluir a los que ya tienen el cargo
-        candidatos = self.talento[self.talento['cargo'] != cargo_vacante].copy()
-        
-        # 2. Algoritmo de "Fit Score" (Simulación de idoneidad)
-        # En una fase avanzada, aquí inyectamos NLP para cruzar el 'feedback_tecnico' con el perfil.
-        # Por ahora, usamos el desempeño global histórico como base ponderada.
-        candidatos['fit_score'] = candidatos['desempeno_global'] * 1.15 
-        
-        # 3. Penalización o bonificación por Área (es más fácil mover a alguien de la misma área)
-        # Asumimos que conocemos el área del cargo vacante consultando los perfiles (omito esa búsqueda por brevedad)
-        
-        sucesores = candidatos.sort_values(by='fit_score', ascending=False).head(top_n)
-        
-        return sucesores[['nombre_completo', 'cargo', 'area', 'fit_score', 'desempeno_global']]
+def generate_adkar_plan(employee_name, target_role, missing_skills):
+    """
+    Genera un plan de desarrollo estructurado en la metodología ADKAR 
+    para cerrar brechas de competencias.
+    """
+    if not missing_skills:
+        return {"status": "ready", "message": f"{employee_name} está listo para el rol de {target_role}."}
+
+    skills_str = ", ".join(missing_skills.keys())
+    
+    adkar_plan = {
+        "colaborador": employee_name,
+        "rol_objetivo": target_role,
+        "fases": {
+            "1_Awareness": f"Comunicar a {employee_name} la necesidad del negocio de fortalecer {skills_str} para asumir {target_role}.",
+            "2_Desire": "Alinear los objetivos personales del colaborador con los incentivos de movilidad interna y compensación del nuevo rol.",
+            "3_Knowledge": f"Asignar módulos técnicos específicos sobre {skills_str} a través del centro de aprendizaje digital.",
+            "4_Ability": f"Asignar un proyecto práctico supervisado donde {employee_name} aplique {skills_str} en un entorno controlado.",
+            "5_Reinforcement": "Establecer revisiones quincenales 360° y validación de adopción de las nuevas competencias."
+        }
+    }
+    
+    return adkar_plan
